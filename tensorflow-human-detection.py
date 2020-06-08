@@ -1,0 +1,110 @@
+# Code adapted from Tensorflow Object Detection Framework
+# https://github.com/tensorflow/models/blob/master/research/object_detection/object_detection_tutorial.ipynb
+# Tensorflow Object Detection Detector
+# python -m pip install tensorflow==1.14
+
+
+import os
+#import time
+import numpy as np
+import tensorflow as tf
+import cv2
+
+
+# Just disables the warning, doesn't enable AVX/FMA
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+
+class DetectorAPI:
+    """
+    DetectorAPI Class
+    """
+    def __init__(self, path_to_ckpt):
+        self.path_to_ckpt = path_to_ckpt
+
+        self.detection_graph = tf.Graph()
+        with self.detection_graph.as_default():
+            od_graph_def = tf.compat.v1.GraphDef()
+            with tf.io.gfile.GFile(self.path_to_ckpt, 'rb') as fid:
+                serialized_graph = fid.read()
+                od_graph_def.ParseFromString(serialized_graph)
+                tf.import_graph_def(od_graph_def, name='')
+
+        self.default_graph = self.detection_graph.as_default()
+        self.sess = tf.compat.v1.Session(graph=self.detection_graph)
+
+        # Definite input and output Tensors for detection_graph
+        self.image_tensor = self.detection_graph.get_tensor_by_name('image_tensor:0')
+        # Each box represents a part of the image where a particular object was detected.
+        self.detection_boxes = self.detection_graph.get_tensor_by_name('detection_boxes:0')
+        # Each score represent how level of confidence for each of the objects.
+        # Score is shown on the result image, together with the class label.
+        self.detection_scores = self.detection_graph.get_tensor_by_name('detection_scores:0')
+        self.detection_classes = self.detection_graph.get_tensor_by_name('detection_classes:0')
+        self.num_detections = self.detection_graph.get_tensor_by_name('num_detections:0')
+
+    def pr_fr(self, image):
+        """
+        pr_fr function.
+        Input self, image
+        """
+        # Expand dimensions since the trained_model expects images to have shape: [1, None, None, 3]
+        image_np_expanded = np.expand_dims(image, axis=0)
+        # Actual detection.
+      #  start_time = time.time()
+        (boxes_inner, scores_inner, classes_inner, num_inner) = self.sess.run(
+            [self.detection_boxes, self.detection_scores, \
+                self.detection_classes, self.num_detections],
+            feed_dict={self.image_tensor: image_np_expanded})
+     #   end_time = time.time()
+
+      #  print("Elapsed Time:", end_time-start_time)
+
+        im_height, im_width, _ = image.shape
+        boxes_list = [None for j in range(boxes_inner.shape[1])]
+        for j in range(boxes_inner.shape[1]):
+            boxes_list[j] = (int(boxes_inner[0, j, 0] * im_height),
+                             int(boxes_inner[0, j, 1] * im_width),
+                             int(boxes_inner[0, j, 2] * im_height),
+                             int(boxes_inner[0, j, 3] * im_width))
+
+        return boxes_list, scores_inner[0].tolist(), \
+            [int(x) for x in classes_inner[0].tolist()], int(num_inner[0])
+   
+    def close(self):
+        """
+        close method
+        """
+        self.sess.close()
+        self.default_graph.close()
+   
+
+if __name__ == "__main__":
+    MODEL_PATH = 'faster_rcnn_inception_v2_coco_2018_01_28\\frozen_inference_graph.pb'
+    ODAPI = DetectorAPI(path_to_ckpt=MODEL_PATH)
+    THRESHOLD = 0.7
+    CAP = cv2.VideoCapture(0)
+
+    while True:
+        R, IMG = CAP.read()
+        IMG = cv2.resize(IMG, (640, 480))
+
+        BOXES, SCORES, CLASSES, NUM = ODAPI.pr_fr(IMG)
+
+        # Visualization of the results of a detection.
+        TOTAL_HUMAN = 0
+        for i, _ in enumerate(BOXES):
+        #for i in range(len(boxes)):
+            # Class 1 represents human
+            if CLASSES[i] == 1 and SCORES[i] > THRESHOLD:
+                box = BOXES[i]
+                cv2.rectangle(IMG, (box[1],box[0]), (box[3], box[2]), (255, 0, 0), 2)
+                print("Human detected")
+                TOTAL_HUMAN += 1
+
+        cv2.imshow("preview", IMG)
+        if TOTAL_HUMAN > 0:
+            print(f"Total human(s) in picture {TOTAL_HUMAN}")
+        KEY = cv2.waitKey(1)
+        if KEY & 0xFF == ord('q'):
+            break
