@@ -67,40 +67,63 @@ class DetectorAPI:
                              int(boxes_inner[0, j, 1] * im_width),
                              int(boxes_inner[0, j, 2] * im_height),
                              int(boxes_inner[0, j, 3] * im_width))
+          #  print(f"Box dimentions ")                 
 
         return boxes_list, scores_inner[0].tolist(), \
             [int(x) for x in classes_inner[0].tolist()], int(num_inner[0])
-   
+
     def close(self):
         """
         close method
         """
         self.sess.close()
         self.default_graph.close()
-   
+
 
 if __name__ == "__main__":
     MODEL_PATH = 'faster_rcnn_inception_v2_coco_2018_01_28\\frozen_inference_graph.pb'
     ODAPI = DetectorAPI(path_to_ckpt=MODEL_PATH)
     THRESHOLD = 0.7
     CAP = cv2.VideoCapture(0)
+   # CAP = cv2.VideoCapture("E:\\1.mkv")
 
     while True:
         R, IMG = CAP.read()
         IMG = cv2.resize(IMG, (640, 480))
 
         BOXES, SCORES, CLASSES, NUM = ODAPI.pr_fr(IMG)
-
+        centers = [] 
         # Visualization of the results of a detection.
         TOTAL_HUMAN = 0
         for i, _ in enumerate(BOXES):
         #for i in range(len(boxes)):
             # Class 1 represents human
+            
             if CLASSES[i] == 1 and SCORES[i] > THRESHOLD:
                 box = BOXES[i]
-                cv2.rectangle(IMG, (box[1],box[0]), (box[3], box[2]), (255, 0, 0), 2)
-                print("Human detected")
+                x, y, w, h = box
+               # print(f"Box dimentions {box}")
+                img = cv2.rectangle(IMG, (box[1], box[0]), (box[3], box[2]), (255, 0, 0), 2)
+                cx1 = x
+                cx2 = x+w
+                cy1 = y
+                cy2 = y + h
+
+                cx = x + (cx2/2)
+                cy = y + (cy2/2)
+
+                centers.append([cx, cy])
+               # cv2.circle(img, (cx, cy), 7, (255, 255, 255), -1)
+               # print("Human detected")
                 TOTAL_HUMAN += 1
+
+
+        if len(centers) >= 2:
+                   # D = np.linalg.norm(cx-cy)
+          #  print(f"center {centers}")       
+            D = centers[0][0] - centers[1][0]
+            if D < 2 :
+                print(f"Social distance is broken")
 
         cv2.imshow("preview", IMG)
         if TOTAL_HUMAN > 0:
