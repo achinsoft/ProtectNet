@@ -122,12 +122,16 @@ if __name__ == "__main__":
                    # D = np.linalg.norm(cx-cy)
           #  print(f"center {centers}")       
             D = centers[0][0] - centers[1][0]
-            if D < 2 :
+            if D < 0:
+                D = D*(-1)
+
+            if D < 20:
                 print(f"Social distance is broken")
 
+            print(f"Distance calculated : {D}")
         cv2.imshow("preview", IMG)
-        if TOTAL_HUMAN > 0:
-            print(f"Total human(s) in picture {TOTAL_HUMAN}")
+        if TOTAL_HUMAN > 1:
+            print(f"Total humans in picture {TOTAL_HUMAN}")
         KEY = cv2.waitKey(1)
         if KEY & 0xFF == ord('q'):
             break
